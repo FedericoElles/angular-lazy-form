@@ -127,7 +127,7 @@ function LazyFormDirective(lazyFormService){
     restrict: 'E',
     scope:{
       'formData':'=',
-      'liveData':'=',
+      'liveData':'=?',
       'formHelper':'=',
       'onSave': '&'
     },
