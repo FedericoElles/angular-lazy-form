@@ -6,6 +6,7 @@ function lazyFormService(){
 
   function FormField(props){
     this._id = '_' + uniqueID++;
+    this._name = props._name;
     this.name = props.name;
     this.mandatory = props.mandatory || false;
     this.value = props.value || '';
@@ -43,6 +44,7 @@ function lazyFormService(){
       var isTextArea = ((name+'')).substr(0,4) === 'text';
 
       var props = {
+        _name: name,
         name: niceName(name),
         type: isTextArea ? 'textarea' : 'text',
         value: value
@@ -52,6 +54,7 @@ function lazyFormService(){
 
     typeHandler['number'] = function(name, value){
       var props = {
+        _name: name,
         name: niceName(name),
         type: 'number',
         value: value || 0
@@ -91,8 +94,8 @@ function lazyFormService(){
     for (var i=0, ii=source.length; i<ii; i+=1){
       field = source[i];
       if (typeHandler[field.type]){
-        target[field.name] = typeHandler[field.type](field.value);
-        console.log(field.name + 'updated to', target[field.name]);
+        target[field._name] = typeHandler[field.type](field.value);
+        console.log(field._name + 'updated to', target[field.name]);
       }
     }
   };
@@ -117,7 +120,7 @@ function LazyFormDirective(lazyFormService){
         '<div ng-if="newRecord" class="form-group">',
           '<label class="col-md-4 control-label" for="textinput">Filename</label>  ',
           '<div class="col-md-8">',
-          '<input ng-model="ctrl.filename" type="text" placeholder="" class="form-control input-md">',
+          '<input ng-model="ctrl.newId" type="text" placeholder="" class="form-control input-md">',
           '<span ng-if="field.hint" class="help-block">help</span> ',
           '</div>',
         '</div>',
@@ -158,8 +161,8 @@ function LazyFormDirective(lazyFormService){
         '<div class="form-group">',
           '<label class="col-md-4 control-label"> </label>',
           '<div class="col-md-8">',
-            '<button ng-click="save()" class="btn btn-success">Save</button> ',
-            '<button class="btn btn-default">Reset</button>',
+            '<button ng-click="save()" ng-disabled="ctrl.isEqual()" class="btn btn-success">Save</button> ',
+            '<button ng-click="ctrl.reset()" class="btn btn-default">Reset</button>',
           '</div>',
         '</div>',
 
@@ -178,9 +181,23 @@ function LazyFormDirective(lazyFormService){
       'onSave': '&'
     },
     controller: function($scope){
+      $scope.ctrl = {
+        newId: '',
+        isEqual: function(){
+          return angular.equals($scope.originalFields, $scope.formFields);
+        },
+        reset: function(){
+          $scope.formFields = angular.copy($scope.originalFields);
+        }
+      };
       $scope.save = function(){
+        if ($scope.newRecord){
+          $scope.id = $scope.ctrl.newId;
+          console.log('save', $scope.id, $scope.ctrl.newId);
+        }
+
         lazyFormService.updateFields($scope.formData, $scope.formFields);
-        $scope.onSave();
+        $scope.onSave({id:$scope.id, doc: $scope.formData});
       };
     },
     link: function ($scope, $element, $attrs) {
@@ -193,7 +210,9 @@ function LazyFormDirective(lazyFormService){
       }, function(newval, oldval){
         if (typeof newval === 'object'){
           $scope.liveData = angular.copy(newval); //good idea?
+          
           $scope.formFields = lazyFormService.generateForm(newval);
+          $scope.originalFields = angular.copy($scope.formFields);
 
           $scope.newRecord = ($scope.id.indexOf('/_new') >= 0);
         }
