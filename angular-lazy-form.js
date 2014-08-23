@@ -12,6 +12,26 @@ function lazyFormService(){
     this.type = props.type || 'input';
   };
 
+  function niceName(name){
+    var newName = name+'';
+    //kill control
+    ['text', 'url'].forEach(function(prefix){
+      if (((name+'')).substr(0,prefix.length) === prefix){
+        newName = ((name+'')).substr(prefix.length);
+        if (prefix === 'url'){
+          newName += ' URL';
+        }
+      }
+    });
+
+    if (newName.substr(0,1) !== newName.substr(0,1).toUpperCase()){
+      newName = newName.substr(0,1).toUpperCase() + newName.substr(1);
+    }
+
+    return newName;
+  }
+
+
   //creates form out of json object
   lazyFormService.generateForm = function(obj){
     var formFields = [],
@@ -20,9 +40,11 @@ function lazyFormService(){
 
 
     typeHandler['string'] = function(name, value){
+      var isTextArea = ((name+'')).substr(0,4) === 'text';
+
       var props = {
-        name: name,
-        type: 'input',
+        name: niceName(name),
+        type: isTextArea ? 'textarea' : 'text',
         value: value
       };
       return new FormField(props);
@@ -30,7 +52,7 @@ function lazyFormService(){
 
     typeHandler['number'] = function(name, value){
       var props = {
-        name: name,
+        name: niceName(name),
         type: 'number',
         value: value || 0
       };
@@ -54,9 +76,13 @@ function lazyFormService(){
     var field, //current field
         typeHandler = {};
 
-    typeHandler['input'] = function(value){
+    typeHandler['text'] = function(value){
       return '' + value;
     };
+
+    typeHandler['textarea'] = function(value){
+      return '' + value;
+    };    
 
     typeHandler['number'] = function(value){
       return value || 0;
@@ -84,13 +110,22 @@ function LazyFormDirective(lazyFormService){
         '<fieldset>',
 
         '<!-- Form Name -->',
-        '<legend>Lazy Form</legend>',
+        '<legend ng-if="!newRecord">Edit <span ng-bind="id"></span></legend>',
+        '<legend ng-if="newRecord">New Record</legend>',
 
+        '<!-- Text input-->',
+        '<div ng-if="newRecord" class="form-group">',
+          '<label class="col-md-4 control-label" for="textinput">Filename</label>  ',
+          '<div class="col-md-8">',
+          '<input ng-model="ctrl.filename" type="text" placeholder="" class="form-control input-md">',
+          '<span ng-if="field.hint" class="help-block">help</span> ',
+          '</div>',
+        '</div>',
         
         '<div ng-repeat="field in formFields">',
 
           '<!-- Text input-->',
-          '<div ng-if="field.type==\'input\'" class="form-group">',
+          '<div ng-if="field.type==\'text\'" class="form-group">',
             '<label ng-bind="field.name" class="col-md-4 control-label" for="textinput">Text Input</label>  ',
             '<div class="col-md-8">',
             '<input name="{{field.name}}" ng-model="field.value" type="text" placeholder="" class="form-control input-md">',
@@ -106,6 +141,16 @@ function LazyFormDirective(lazyFormService){
             '<span ng-if="field.hint" class="help-block">help</span> ',
             '</div>',
           '</div>',
+
+
+          '<!-- Textarea -->',
+          '<div ng-if="field.type==\'textarea\'" class="form-group">',
+            '<label ng-bind="field.name" class="col-md-4 control-label" for="textarea">Text Area</label>',
+            '<div class="col-md-8">',
+              '<textarea class="form-control" name="{{field.name}}" ng-model="field.value"></textarea>',
+            '</div>',
+          '</div>',
+
 
         '</div>',
 
@@ -128,6 +173,7 @@ function LazyFormDirective(lazyFormService){
     scope:{
       'formData':'=',
       'liveData':'=?',
+      'id':'=?',
       'formHelper':'=',
       'onSave': '&'
     },
@@ -140,6 +186,7 @@ function LazyFormDirective(lazyFormService){
     link: function ($scope, $element, $attrs) {
       console.log('$scope', $scope);
 
+      
       //parse input into form
       $scope.$watch(function(){
         return $scope.formData;
@@ -147,6 +194,8 @@ function LazyFormDirective(lazyFormService){
         if (typeof newval === 'object'){
           $scope.liveData = angular.copy(newval); //good idea?
           $scope.formFields = lazyFormService.generateForm(newval);
+
+          $scope.newRecord = ($scope.id.indexOf('/_new') >= 0);
         }
       }, true);
 
