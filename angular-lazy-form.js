@@ -74,29 +74,38 @@ function lazyFormService(){
   };
 
 
+  var updateTypeHandler = {};
+
+  updateTypeHandler['text'] = function(value){
+    return '' + value;
+  };
+
+  updateTypeHandler['textarea'] = function(value){
+    return '' + value;
+  };    
+
+  updateTypeHandler['number'] = function(value){
+    return value || 0;
+  };
+
+  lazyFormService.updateField = function(target, field){
+    if (updateTypeHandler[field.type]){
+      target[field._name] = updateTypeHandler[field.type](field.value);
+      console.log(field._name + 'updated to', target[field._name]);
+    }
+  };  
+
   //applies form changes to target model
   lazyFormService.updateFields = function(target, source){
-    var field, //current field
-        typeHandler = {};
-
-    typeHandler['text'] = function(value){
-      return '' + value;
-    };
-
-    typeHandler['textarea'] = function(value){
-      return '' + value;
-    };    
-
-    typeHandler['number'] = function(value){
-      return value || 0;
-    };
-
+    var field; //current field
+   
     for (var i=0, ii=source.length; i<ii; i+=1){
       field = source[i];
-      if (typeHandler[field.type]){
-        target[field._name] = typeHandler[field.type](field.value);
-        console.log(field._name + 'updated to', target[field.name]);
-      }
+      lazyFormService.updateField(target, field);
+      //if (typeHandler[field.type]){
+      //  target[field._name] = typeHandler[field.type](field.value);
+      //  console.log(field._name + 'updated to', target[field.name]);
+      //}
     }
   };
 
@@ -131,7 +140,7 @@ function LazyFormDirective(lazyFormService){
           '<div ng-if="field.type==\'text\'" class="form-group">',
             '<label ng-bind="field.name" class="col-md-4 control-label" for="textinput">Text Input</label>  ',
             '<div class="col-md-8">',
-            '<input name="{{field.name}}" ng-model="field.value" type="text" placeholder="" class="form-control input-md">',
+            '<input name="{{field.name}}" ng-model="field.value" ng-change="ctrl.updateLive(field)" type="text" placeholder="" class="form-control input-md">',
             '<span ng-if="field.hint" class="help-block">help</span> ',
             '</div>',
           '</div>',
@@ -140,7 +149,7 @@ function LazyFormDirective(lazyFormService){
           '<div ng-if="field.type==\'number\'" class="form-group">',
             '<label ng-bind="field.name" class="col-md-4 control-label" for="textinput">Text Input</label>  ',
             '<div class="col-md-8">',
-            '<input name="{{field.name}}" ng-model="field.value" type="number" placeholder="0" class="form-control input-md">',
+            '<input name="{{field.name}}" ng-model="field.value" ng-change="ctrl.updateLive(field)" type="number" placeholder="0" class="form-control input-md">',
             '<span ng-if="field.hint" class="help-block">help</span> ',
             '</div>',
           '</div>',
@@ -150,7 +159,7 @@ function LazyFormDirective(lazyFormService){
           '<div ng-if="field.type==\'textarea\'" class="form-group">',
             '<label ng-bind="field.name" class="col-md-4 control-label" for="textarea">Text Area</label>',
             '<div class="col-md-8">',
-              '<textarea class="form-control" name="{{field.name}}" ng-model="field.value"></textarea>',
+              '<textarea class="form-control" name="{{field.name}}" ng-model="field.value" ng-change="ctrl.updateLive(field)"></textarea>',
             '</div>',
           '</div>',
 
@@ -183,6 +192,9 @@ function LazyFormDirective(lazyFormService){
     controller: function($scope){
       $scope.ctrl = {
         newId: '',
+        updateLive: function(field){
+          lazyFormService.updateField($scope.liveData, field);
+        },
         isEqual: function(){
           return angular.equals($scope.originalFields, $scope.formFields);
         },
