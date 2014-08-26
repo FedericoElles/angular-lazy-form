@@ -1,0 +1,8 @@
+{
+  "name": "angular-lazy-form",
+  "version": "1.0.0",
+  "main": "./angular-lazy-form.js",
+  "dependencies": {
+    "angular": "1.2.15"
+  }
+}
