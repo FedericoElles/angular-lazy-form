@@ -11,12 +11,13 @@ function lazyFormService(){
     this.mandatory = props.mandatory || false;
     this.value = props.value || '';
     this.type = props.type || 'input';
+    this.options = props.options || [];
   };
 
   function niceName(name){
     var newName = name+'';
     //kill control
-    ['text', 'url'].forEach(function(prefix){
+    ['text', 'url', 'select'].forEach(function(prefix){
       if (((name+'')).substr(0,prefix.length) === prefix){
         newName = ((name+'')).substr(prefix.length);
         if (prefix === 'url'){
@@ -34,7 +35,7 @@ function lazyFormService(){
 
 
   //creates form out of json object
-  lazyFormService.generateForm = function(obj){
+  lazyFormService.generateForm = function(obj, helper){
     var formFields = [],
         xType, //type of current object property
         typeHandler = {};
@@ -42,13 +43,25 @@ function lazyFormService(){
 
     typeHandler['string'] = function(name, value){
       var isTextArea = ((name+'')).substr(0,4) === 'text';
+      var isSelect = ((name+'')).substr(0,6) === 'select';
+
+      var type = isTextArea ? 'textarea' : 'text';
+      type = isSelect ? 'select' : type;
 
       var props = {
         _name: name,
         name: niceName(name),
-        type: isTextArea ? 'textarea' : 'text',
+        type: type,
         value: value
       };
+
+      if (isSelect){
+        if (!angular.isArray(helper[name])){
+          throw 'generateForm: select field ' + name + 
+          ' must have array of values defined in form-helper['+name+'] '; 
+        }
+        props.options = helper[name];
+      }
       return new FormField(props);
     };
 
@@ -61,6 +74,7 @@ function lazyFormService(){
       };
       return new FormField(props);
     };
+
 
     //run type handler for all object properties
     for (var x in obj){
@@ -87,6 +101,10 @@ function lazyFormService(){
   updateTypeHandler['number'] = function(value){
     return value || 0;
   };
+
+  updateTypeHandler['select'] = function(value){
+    return '' + value;
+  };      
 
   lazyFormService.updateField = function(target, field){
     if (updateTypeHandler[field.type]){
@@ -163,6 +181,17 @@ function LazyFormDirective(lazyFormService){
             '</div>',
           '</div>',
 
+          '<!-- Select Basic -->',
+          '<div ng-if="field.type==\'select\'" class="form-group">',
+            '<label ng-bind="field.name" class="col-md-4 control-label" for="{{field.name}}"></label>',
+            '<div class="col-md-8">',
+              '<select ng-model="field.value" ',
+                      'ng-change="ctrl.updateLive(field)" ',
+                      'ng-options="value for value in field.options" ',
+                      'name="{{field.name}}" class="form-control">',
+              '</select>',
+          '  </div>',
+          '</div>',
 
         '</div>',
 
@@ -223,7 +252,7 @@ function LazyFormDirective(lazyFormService){
         if (typeof newval === 'object'){
           $scope.liveData = angular.copy(newval); //good idea?
           
-          $scope.formFields = lazyFormService.generateForm(newval);
+          $scope.formFields = lazyFormService.generateForm(newval, $scope.formHelper);
           $scope.originalFields = angular.copy($scope.formFields);
 
           $scope.newRecord = ($scope.id.indexOf('/_new') >= 0);
