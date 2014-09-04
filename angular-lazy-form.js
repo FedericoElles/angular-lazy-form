@@ -37,11 +37,15 @@ function lazyFormService(){
   //creates form out of json object
   lazyFormService.generateForm = function(obj, helper){
     var formFields = [],
-        xType, //type of current object property
         typeHandler = {};
 
-
-    typeHandler['string'] = function(name, value){
+    /**
+     * If JSON attribute is a string create either
+     * - text field
+     * - textarea
+     * - select field
+     */
+    typeHandler['string'] = function(name, value, path){
       var isTextArea = ((name+'')).substr(0,4) === 'text';
       var isSelect = ((name+'')).substr(0,6) === 'select';
 
@@ -49,7 +53,7 @@ function lazyFormService(){
       type = isSelect ? 'select' : type;
 
       var props = {
-        _name: name,
+        _name: path + name,
         name: niceName(name),
         type: type,
         value: value
@@ -65,9 +69,12 @@ function lazyFormService(){
       return new FormField(props);
     };
 
-    typeHandler['number'] = function(name, value){
+    /**
+     * If JSON attribute is a number create a number field
+     */
+    typeHandler['number'] = function(name, value, path){
       var props = {
-        _name: name,
+        _name: path + name,
         name: niceName(name),
         type: 'number',
         value: value || 0
@@ -75,14 +82,41 @@ function lazyFormService(){
       return new FormField(props);
     };
 
+    /**
+     * If JSON Attribute is a object
+     */
+    typeHandler['object'] = function(name, value, path){
+      //analyse object
+      var objectType = 'default';
+      //
 
-    //run type handler for all object properties
-    for (var x in obj){
-      xType = (typeof obj[x]);
-      if (typeHandler[xType]){
-        formFields.push(typeHandler[xType](x, obj[x]));
+      if (objectType === 'default'){
+        analyseObj(value, path + name + '.');
+      }
+    };
+
+    /**
+     * Analyse the current object
+     */
+    var analyseObj = function(obj, path){
+      var xType; //type of current object property
+      //run type handler for all object properties
+      for (var x in obj){
+        xType = (typeof obj[x]); 
+        if (typeHandler[xType]){
+          var newField = typeHandler[xType](x, obj[x], path || '');
+          if (angular.isArray(newField)){
+            formFields = formFields.join(newField);
+          } else {
+            formFields.push(newField);
+          }
+        } else {
+          throw 'generateForm: no handler for attribute type ' + xType;
+        }
       }
     }
+
+    analyseObj(obj); //start the madness
 
     return formFields;
   };
