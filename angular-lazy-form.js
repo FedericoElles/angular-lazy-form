@@ -93,6 +93,7 @@ function lazyFormService(){
       if (objectType === 'default'){
         analyseObj(value, path + name + '.');
       }
+      return false;
     };
 
     /**
@@ -105,9 +106,7 @@ function lazyFormService(){
         xType = (typeof obj[x]); 
         if (typeHandler[xType]){
           var newField = typeHandler[xType](x, obj[x], path || '');
-          if (angular.isArray(newField)){
-            formFields = formFields.join(newField);
-          } else {
+          if (angular.isObject(newField)){
             formFields.push(newField);
           }
         } else {
@@ -141,23 +140,28 @@ function lazyFormService(){
   };      
 
   lazyFormService.updateField = function(target, field){
+    var targetObject = target,
+        fieldPath = field._name.split('.');
+
+    var finalAttribute = fieldPath[fieldPath.length-1];
+
+    for (var i=0, ii=fieldPath.length-1;i<ii;i+=1){
+      targetObject = targetObject[fieldPath[i]];
+    }
+
     if (updateTypeHandler[field.type]){
-      target[field._name] = updateTypeHandler[field.type](field.value);
-      console.log(field._name + 'updated to', target[field._name]);
+      targetObject[finalAttribute] = updateTypeHandler[field.type](field.value);
+      //console.log(field._name + 'updated to', targetObject[finalAttribute]);
     }
   };  
 
   //applies form changes to target model
   lazyFormService.updateFields = function(target, source){
     var field; //current field
-   
+    console.log('updateFields', target, source);
     for (var i=0, ii=source.length; i<ii; i+=1){
       field = source[i];
       lazyFormService.updateField(target, field);
-      //if (typeHandler[field.type]){
-      //  target[field._name] = typeHandler[field.type](field.value);
-      //  console.log(field._name + 'updated to', target[field.name]);
-      //}
     }
   };
 
@@ -268,7 +272,7 @@ function LazyFormDirective(lazyFormService){
       $scope.save = function(){
         if ($scope.newRecord){
           $scope.id = $scope.ctrl.newId;
-          console.log('save', $scope.id, $scope.ctrl.newId);
+          //console.log('save', $scope.id, $scope.ctrl.newId);
         }
 
         lazyFormService.updateFields($scope.formData, $scope.formFields);
