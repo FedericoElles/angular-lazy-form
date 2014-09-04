@@ -20,6 +20,7 @@ function lazyFormService(){
     ['text', 'url', 'select'].forEach(function(prefix){
       if (((name+'')).substr(0,prefix.length) === prefix){
         newName = ((name+'')).substr(prefix.length);
+        newName = newName.replace(/([a-z])([A-Z])/g, '$1 $2');
         if (prefix === 'url'){
           newName += ' URL';
         }
