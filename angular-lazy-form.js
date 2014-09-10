@@ -4,14 +4,32 @@ function lazyFormService(){
   var lazyFormService = {};
   var uniqueID = 0;
 
+  var rowSize = {
+    1: [12,4, 8],
+    2: [6, 4, 8],
+    3: [4, 5, 7],
+    4: [3, 6, 6],
+    6: [2, 6, 6]
+  };
+
   function FormField(props){
     this._id = '_' + uniqueID++;
-    this._name = props._name;
-    this.name = props.name;
+    this._name = props._name || '';
+    this.name = props.name || '';
     this.mandatory = props.mandatory || false;
     this.value = props.value || '';
     this.type = props.type || 'input';
     this.options = props.options || [];
+
+    if (rowSize[props.rowSize]){
+      this.width = rowSize[props.rowSize][0];      
+      this.widthCaption = rowSize[props.rowSize][1];
+      this.widthField = rowSize[props.rowSize][2];
+    } else {
+      this.widthCaption = 12; 
+      this.widthCaption = 4;
+      this.widthField = 8;
+    }
   };
 
   function niceName(name){
@@ -46,7 +64,7 @@ function lazyFormService(){
      * - textarea
      * - select field
      */
-    typeHandler['string'] = function(name, value, path){
+    typeHandler['string'] = function(name, value, path, mods){
       var isTextArea = ((name+'')).substr(0,4) === 'text';
       var isSelect = ((name+'')).substr(0,6) === 'select';
 
@@ -67,19 +85,22 @@ function lazyFormService(){
         }
         props.options = helper[name];
       }
+      angular.copy(props, mods);
       return new FormField(props);
     };
 
     /**
      * If JSON attribute is a number create a number field
      */
-    typeHandler['number'] = function(name, value, path){
+    typeHandler['number'] = function(name, value, path, mods){
       var props = {
         _name: path + name,
         name: niceName(name),
         type: 'number',
         value: value || 0
       };
+      angular.extend(props, mods);
+      console.log('number', props);
       return new FormField(props);
     };
 
@@ -88,25 +109,65 @@ function lazyFormService(){
      */
     typeHandler['object'] = function(name, value, path){
       //analyse object
+      var mods = {
+        rowSize:1
+      };
+
+      var analysis = {
+        count: 0,
+        types:{
+          number: 0,
+          string: 0,
+          object: 0
+        }
+      };
+
+      for (var x in value){
+        analysis.count += 1;
+        analysis.types[typeof value[x]] += 1;
+      }
+
+      if (analysis.count === analysis.types.number &&
+          (
+            analysis.count === 2 ||
+            analysis.count === 3 ||
+            analysis.count === 4  
+          )){
+        mods.rowSize = analysis.count;
+        
+      }
+      console.log('mods', mods, analysis);
+
+      //subobject header
+      formFields.push(new FormField({
+        type: 'h2',
+        name: niceName(name) 
+      }));
+
       var objectType = 'default';
       //
 
       if (objectType === 'default'){
-        analyseObj(value, path + name + '.');
+        analyseObj(value, path + name + '.', mods);
       }
+
+      //subobject footer
+      formFields.push(new FormField({
+        type: 'hr'
+      }));      
       return false;
     };
 
     /**
      * Analyse the current object
      */
-    var analyseObj = function(obj, path){
+    var analyseObj = function(obj, path, mods){
       var xType; //type of current object property
       //run type handler for all object properties
       for (var x in obj){
         xType = (typeof obj[x]); 
         if (typeHandler[xType]){
-          var newField = typeHandler[xType](x, obj[x], path || '');
+          var newField = typeHandler[xType](x, obj[x], path || '', mods);
           if (angular.isObject(newField)){
             formFields.push(newField);
           }
@@ -141,18 +202,20 @@ function lazyFormService(){
   };      
 
   lazyFormService.updateField = function(target, field){
-    var targetObject = target,
-        fieldPath = field._name.split('.');
+    if (field._name){
+      var targetObject = target,
+          fieldPath = field._name.split('.');
 
-    var finalAttribute = fieldPath[fieldPath.length-1];
+      var finalAttribute = fieldPath[fieldPath.length-1];
 
-    for (var i=0, ii=fieldPath.length-1;i<ii;i+=1){
-      targetObject = targetObject[fieldPath[i]];
-    }
+      for (var i=0, ii=fieldPath.length-1;i<ii;i+=1){
+        targetObject = targetObject[fieldPath[i]];
+      }
 
-    if (updateTypeHandler[field.type]){
-      targetObject[finalAttribute] = updateTypeHandler[field.type](field.value);
-      //console.log(field._name + 'updated to', targetObject[finalAttribute]);
+      if (updateTypeHandler[field.type]){
+        targetObject[finalAttribute] = updateTypeHandler[field.type](field.value);
+        //console.log(field._name + 'updated to', targetObject[finalAttribute]);
+      }
     }
   };  
 
@@ -191,12 +254,12 @@ function LazyFormDirective(lazyFormService){
           '</div>',
         '</div>',
         
-        '<div ng-repeat="field in formFields">',
+        '<div ng-repeat="field in formFields" class="col-md-{{field.width}}">',
 
           '<!-- Text input-->',
           '<div ng-if="field.type==\'text\'" class="form-group">',
-            '<label ng-bind="field.name" class="col-md-4 control-label" for="textinput">Text Input</label>  ',
-            '<div class="col-md-8">',
+            '<label ng-bind="field.name" class="col-md-{{field.widthCaption}} control-label" for="textinput">Text Input</label>  ',
+            '<div class="col-md-{{field.widthField}}">',
             '<input name="{{field.name}}" ng-model="field.value" ng-change="ctrl.updateLive(field)" type="text" placeholder="" class="form-control input-md">',
             '<span ng-if="field.hint" class="help-block">help</span> ',
             '</div>',
@@ -204,8 +267,8 @@ function LazyFormDirective(lazyFormService){
 
           '<!-- Number input-->',
           '<div ng-if="field.type==\'number\'" class="form-group">',
-            '<label ng-bind="field.name" class="col-md-4 control-label" for="textinput">Text Input</label>  ',
-            '<div class="col-md-8">',
+            '<label ng-bind="field.name" class="col-md-{{field.widthCaption}} control-label" for="textinput">Text Input</label>  ',
+            '<div class="col-md-{{field.widthField}}">',
             '<input name="{{field.name}}" ng-model="field.value" ng-change="ctrl.updateLive(field)" type="number" placeholder="0" class="form-control input-md">',
             '<span ng-if="field.hint" class="help-block">help</span> ',
             '</div>',
@@ -214,16 +277,16 @@ function LazyFormDirective(lazyFormService){
 
           '<!-- Textarea -->',
           '<div ng-if="field.type==\'textarea\'" class="form-group">',
-            '<label ng-bind="field.name" class="col-md-4 control-label" for="textarea">Text Area</label>',
-            '<div class="col-md-8">',
+            '<label ng-bind="field.name" class="col-md-{{field.widthCaption}} control-label" for="textarea">Text Area</label>',
+            '<div class="col-md-{{field.widthField}}">',
               '<textarea class="form-control" name="{{field.name}}" ng-model="field.value" ng-change="ctrl.updateLive(field)"></textarea>',
             '</div>',
           '</div>',
 
           '<!-- Select Basic -->',
           '<div ng-if="field.type==\'select\'" class="form-group">',
-            '<label ng-bind="field.name" class="col-md-4 control-label" for="{{field.name}}"></label>',
-            '<div class="col-md-8">',
+            '<label ng-bind="field.name" class="col-md-{{field.widthCaption}} control-label" for="{{field.name}}"></label>',
+            '<div class="col-md-{{field.widthField}}">',
               '<select ng-model="field.value" ',
                       'ng-change="ctrl.updateLive(field)" ',
                       'ng-options="value for value in field.options" ',
@@ -231,6 +294,11 @@ function LazyFormDirective(lazyFormService){
               '</select>',
           '  </div>',
           '</div>',
+
+          //additional styles
+          '<legend ng-if="field.type===\'h2\'"><small ng-bind="field.name"></small></legend>',
+
+          '<div class="col-md-12" ng-if="field.type===\'hr\'">&nbsp;</div>' +
 
         '</div>',
 
